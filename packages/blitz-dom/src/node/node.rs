@@ -2,6 +2,7 @@ use atomic_refcell::{AtomicRef, AtomicRefCell};
 use bitflags::bitflags;
 use blitz_traits::events::{BlitzMouseButtonEvent, DomEventData, HitResult};
 use keyboard_types::Modifiers;
+use layout_api::{GenericLayoutData, StyleData};
 use markup5ever::{LocalName, local_name};
 use parley::Cluster;
 use peniko::kurbo;
@@ -94,7 +95,7 @@ pub struct Node {
 
     // This little bundle of joy is our style data from stylo and a lock guard that allows access to it
     // TODO: See if guard can be hoisted to a higher level
-    pub stylo_element_data: AtomicRefCell<Option<StyloElementData>>,
+    pub stylo_element_data: AtomicRefCell<Option<StyleData>>,
     pub selector_flags: AtomicRefCell<ElementSelectorFlags>,
     pub guard: SharedRwLock,
     pub element_state: ElementState,
@@ -112,7 +113,12 @@ pub struct Node {
     pub unrounded_layout: Layout,
     pub final_layout: Layout,
     pub scroll_offset: kurbo::Point,
+
+    // servo layout data
+    pub layout_data: AtomicRefCell<Option<Box<GenericLayoutData>>>
 }
+
+unsafe impl Sync for Node {}
 
 impl Node {
     pub(crate) fn new(
@@ -150,6 +156,8 @@ impl Node {
             unrounded_layout: Layout::new(),
             final_layout: Layout::new(),
             scroll_offset: kurbo::Point::ZERO,
+
+            layout_data: Default::default(),
         }
     }
 
@@ -216,7 +224,7 @@ impl Node {
 
     pub fn set_restyle_hint(&mut self, hint: RestyleHint) {
         if let Some(element_data) = self.stylo_element_data.borrow_mut().as_mut() {
-            element_data.hint.insert(hint);
+            element_data.element_data.get_mut().hint.insert(hint);
         }
     }
 
@@ -594,19 +602,38 @@ impl Node {
         Some(&attr.value)
     }
 
-    pub fn primary_styles(&self) -> Option<AtomicRef<'_, ComputedValues>> {
+    // pub fn primary_styles(&self) -> Option<AtomicRef<'_, ComputedValues>> {
+    //     let stylo_element_data = self.stylo_element_data.borrow();
+    //     if stylo_element_data
+    //         .as_ref()
+    //         .and_then(|d| d.styles.get_primary())
+    //         .is_some()
+    //     {
+    //         Some(AtomicRef::map(
+    //             stylo_element_data,
+    //             |data: &Option<StyloElementData>| -> &ComputedValues {
+    //                 data.as_ref().unwrap().styles.get_primary().unwrap()
+    //             },
+    //         ))
+    //     } else {
+    //         None
+    //     }
+    // }
+
+    pub fn primary_styles(&self) -> Option<style::servo_arc::Arc<ComputedValues>> {
         let stylo_element_data = self.stylo_element_data.borrow();
         if stylo_element_data
             .as_ref()
-            .and_then(|d| d.styles.get_primary())
+            .and_then(|d| d.element_data.borrow().styles.get_primary().map(|v| v.clone()))
             .is_some()
         {
-            Some(AtomicRef::map(
-                stylo_element_data,
-                |data: &Option<StyloElementData>| -> &ComputedValues {
-                    data.as_ref().unwrap().styles.get_primary().unwrap()
-                },
-            ))
+            // Some(AtomicRef::map(
+            //     stylo_element_data,
+            //     |data | -> &ComputedValues {
+            //         data.as_ref().unwrap().element_data.borrow().styles.get_primary().unwrap().clone()
+            //     },
+            // ))
+            Some(style::servo_arc::Arc::clone(stylo_element_data.as_ref().unwrap().element_data.borrow().styles.get_primary().unwrap()))
         } else {
             None
         }
@@ -770,10 +797,10 @@ impl std::fmt::Debug for Node {
             .field("id", &self.id)
             .field("is_inline_root", &self.flags.is_inline_root())
             .field("children", &self.children)
-            .field("layout_children", &self.layout_children.borrow())
+            // .field("layout_children", &self.layout_children.borrow())
             // .field("style", &self.style)
             .field("node", &self.data)
-            .field("stylo_element_data", &self.stylo_element_data)
+            // .field("stylo_element_data", &self.stylo_element_data.borrow().as_ref().map(|v| v.element_data.borrow()))
             // .field("unrounded_layout", &self.unrounded_layout)
             // .field("final_layout", &self.final_layout)
             .finish()

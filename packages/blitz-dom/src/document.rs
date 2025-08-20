@@ -18,6 +18,7 @@ use blitz_traits::navigation::{DummyNavigationProvider, NavigationProvider};
 use blitz_traits::net::{DummyNetProvider, NetProvider, SharedProvider};
 use blitz_traits::shell::{ColorScheme, DummyShellProvider, ShellProvider, Viewport};
 use cursor_icon::CursorIcon;
+use layout_api::StyleData;
 use markup5ever::local_name;
 use parley::FontContext;
 use peniko::{Blob, kurbo};
@@ -286,7 +287,11 @@ impl BaseDocument {
             },
             ..Default::default()
         };
-        *doc.root_node().stylo_element_data.borrow_mut() = Some(stylo_element_data);
+        let style_data = StyleData {
+            element_data: atomic_refcell::AtomicRefCell::new(stylo_element_data),
+            parallel: Default::default(),
+        };
+        *doc.root_node().stylo_element_data.borrow_mut() = Some(style_data);
 
         doc
     }

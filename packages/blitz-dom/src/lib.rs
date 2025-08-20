@@ -46,7 +46,7 @@ mod layout;
 mod mutator;
 mod query_selector;
 /// Implementations that interact with servo's style engine
-mod stylo;
+pub mod stylo;
 mod stylo_to_cursor_icon;
 mod stylo_to_parley;
 mod traversal;

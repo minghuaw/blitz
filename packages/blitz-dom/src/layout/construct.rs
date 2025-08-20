@@ -1,6 +1,8 @@
 use core::str;
 use std::sync::Arc;
 
+use atomic_refcell::AtomicRefCell;
+use layout_api::StyleData;
 use markup5ever::{QualName, local_name, ns};
 use parley::{FontStack, InlineBox, StyleProperty, TreeBuilder, WhiteSpaceCollapse};
 use slab::Slab;
@@ -308,10 +310,10 @@ fn flush_pseudo_elements(doc: &mut BaseDocument, node_id: usize) {
         let style_data = node.stylo_element_data.borrow();
         let before_style = style_data
             .as_ref()
-            .and_then(|d| d.styles.pseudos.as_array()[1].clone());
+            .and_then(|d| d.element_data.borrow().styles.pseudos.as_array()[1].clone());
         let after_style = style_data
             .as_ref()
-            .and_then(|d| d.styles.pseudos.as_array()[0].clone());
+            .and_then(|d| d.element_data.borrow().styles.pseudos.as_array()[0].clone());
 
         (before_style, after_style, before_node_id, after_node_id)
     };
@@ -353,7 +355,11 @@ fn flush_pseudo_elements(doc: &mut BaseDocument, node_id: usize) {
             let mut element_data = StyloElementData::default();
             element_data.styles.primary = Some(pe_style.clone());
             element_data.set_restyled();
-            *doc.nodes[new_node_id].stylo_element_data.borrow_mut() = Some(element_data);
+            let style_data = StyleData {
+                element_data: AtomicRefCell::new(element_data),
+                parallel: Default::default(),
+            };
+            *doc.nodes[new_node_id].stylo_element_data.borrow_mut() = Some(style_data);
 
             doc.nodes[node_id].set_pe_by_index(idx, Some(new_node_id));
         }
@@ -364,11 +370,11 @@ fn flush_pseudo_elements(doc: &mut BaseDocument, node_id: usize) {
 
             let mut node_styles = doc.nodes[pe_node_id].stylo_element_data.borrow_mut();
             let node_styles = &mut node_styles.as_mut().unwrap();
-            let primary_styles = &mut node_styles.styles.primary;
+            let primary_styles = &mut node_styles.element_data.get_mut().styles.primary;
 
             if !std::ptr::eq(&**primary_styles.as_ref().unwrap(), &*pe_style) {
                 *primary_styles = Some(pe_style);
-                node_styles.set_restyled();
+                node_styles.element_data.get_mut().set_restyled();
             }
         }
     }
@@ -646,7 +652,11 @@ fn collect_complex_layout_children(
                 let mut stylo_element_data = StyloElementData::default();
                 stylo_element_data.styles.primary = Some(style);
                 stylo_element_data.set_restyled();
-                *doc.nodes[node_id].stylo_element_data.borrow_mut() = Some(stylo_element_data);
+                let style_data = StyleData {
+                    element_data: AtomicRefCell::new(stylo_element_data),
+                    parallel: Default::default()
+                };
+                *doc.nodes[node_id].stylo_element_data.borrow_mut() = Some(style_data);
 
                 layout_children.push(node_id);
                 *anonymous_block_id = Some(node_id);

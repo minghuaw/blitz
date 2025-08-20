@@ -64,13 +64,13 @@ impl crate::document::BaseDocument {
             let stylo_element_data = node.stylo_element_data.borrow();
             let primary_styles = stylo_element_data
                 .as_ref()
-                .and_then(|data| data.styles.get_primary());
+                .and_then(|data| data.element_data.borrow().styles.get_primary().map(Arc::clone));
 
             let Some(style) = primary_styles else {
                 return;
             };
 
-            node.style = stylo_taffy::to_taffy_style(style);
+            node.style = stylo_taffy::to_taffy_style(&style);
 
             node.display_outer = match style.clone_display().outside() {
                 DisplayOutside::None => crate::node::DisplayOuter::None,
@@ -761,7 +761,7 @@ impl<'a> TElement for BlitzNode<'a> {
         if stylo_data.is_none() {
             *stylo_data = Some(Default::default());
         }
-        AtomicRefMut::map(stylo_data, |sd| sd.as_mut().unwrap())
+        AtomicRefMut::map(stylo_data, |sd| sd.as_mut().unwrap().element_data.get_mut())
     }
 
     unsafe fn clear_data(&self) {
@@ -775,7 +775,7 @@ impl<'a> TElement for BlitzNode<'a> {
     fn borrow_data(&self) -> Option<AtomicRef<style::data::ElementData>> {
         let stylo_data = self.stylo_element_data.borrow();
         if stylo_data.is_some() {
-            Some(AtomicRef::map(stylo_data, |sd| sd.as_ref().unwrap()))
+            Some(AtomicRef::map(stylo_data, |sd| unsafe { &*(sd.as_ref().unwrap().element_data.as_ptr()) }))
         } else {
             None
         }
@@ -784,7 +784,7 @@ impl<'a> TElement for BlitzNode<'a> {
     fn mutate_data(&self) -> Option<AtomicRefMut<style::data::ElementData>> {
         let stylo_data = self.stylo_element_data.borrow_mut();
         if stylo_data.is_some() {
-            Some(AtomicRefMut::map(stylo_data, |sd| sd.as_mut().unwrap()))
+            Some(AtomicRefMut::map(stylo_data, |sd| sd.as_mut().unwrap().element_data.get_mut()))
         } else {
             None
         }

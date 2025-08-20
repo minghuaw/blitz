@@ -189,7 +189,7 @@ impl DocumentMutator<'_> {
 
         let node = &mut self.doc.nodes[node_id];
         if let Some(data) = &mut *node.stylo_element_data.borrow_mut() {
-            data.hint |= RestyleHint::restyle_subtree();
+            data.element_data.borrow_mut().hint |= RestyleHint::restyle_subtree();
         }
 
         let NodeData::Element(ref mut element) = node.data else {
@@ -233,7 +233,7 @@ impl DocumentMutator<'_> {
 
         let mut stylo_element_data = node.stylo_element_data.borrow_mut();
         if let Some(data) = &mut *stylo_element_data {
-            data.hint |= RestyleHint::restyle_subtree();
+            data.element_data.borrow_mut().hint |= RestyleHint::restyle_subtree();
         }
         drop(stylo_element_data);
 
