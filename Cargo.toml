@@ -62,7 +62,8 @@ style_dom = { package = "stylo_dom", git = "https://github.com/servo/stylo", bra
 selectors = { package = "selectors", git = "https://github.com/servo/stylo", branch = "2025-07-01" }
 
 # local servo deps
-layout_api = { path="../servo/components/shared/layout" }
+# layout_api = { path="../servo/components/shared/layout" }
+layout_api = { git = "https://github.com/minghuaw/servo.git", branch = "exp/parallel-mainthread" }
 
 markup5ever = "0.35" # needs to match stylo web_atoms version
 html5ever = "0.35" # needs to match stylo web_atoms version
